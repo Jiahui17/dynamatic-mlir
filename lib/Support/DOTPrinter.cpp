@@ -694,12 +694,22 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
                 return info;
               })
           .Case<handshake::OEHBOp>([&](handshake::OEHBOp oehbOp) {
+            if (oehbOp.getSlots() == 1) {
+              auto info = NodeInfo("OEHB");
+              info.intAttr["slots"] = oehbOp.getSlots();
+              return info;
+            }
             auto info = NodeInfo("Buffer");
             info.intAttr["slots"] = oehbOp.getSlots();
             info.stringAttr["transparent"] = "false";
             return info;
           })
           .Case<handshake::TEHBOp>([&](handshake::TEHBOp tehbOp) {
+            if (tehbOp.getSlots() == 1) {
+              auto info = NodeInfo("TEHB");
+              info.intAttr["slots"] = tehbOp.getSlots();
+              return info;
+            }
             auto info = NodeInfo("Buffer");
             info.intAttr["slots"] = tehbOp.getSlots();
             info.stringAttr["transparent"] = "true";
