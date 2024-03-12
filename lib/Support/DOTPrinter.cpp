@@ -19,6 +19,7 @@
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
+#include "experimental/Transforms/Speculation/SpecAnnotatePaths.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -893,6 +894,12 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             info.stringAttr["op"] = cmpFNameToOpName[op.getPredicate()];
             return info;
           })
+          .Case<handshake::SpeculationOpInterface>([&](Operation *op) {
+            auto info = NodeInfo(op->getName().stripDialect().str());
+            info.stringAttr["in"] = getIOFromValues(op->getOperands(), "in");
+            info.stringAttr["out"] = getIOFromValues(op->getResults(), "out");
+            return info;
+          })
           .Default([&](auto) {
             // All our supported "mathematical" operations are stored in a map,
             // query it to see if we support this particular operation
@@ -944,6 +951,9 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
   // II is 1 for all operators
   if (info.type == "Operator")
     info.intAttr["II"] = 1;
+
+  if (experimental::speculation::isSpeculative(op, true))
+    info.intAttr["speculative"] = 1;
 
   info.print(os);
   return success();
@@ -1275,6 +1285,7 @@ static StringRef getNodeColor(Operation *op) {
           [&](auto) { return "lightblue"; })
       .Case<handshake::BranchOp, handshake::ConditionalBranchOp>(
           [&](auto) { return "tan2"; })
+      .Case<handshake::SpeculationOpInterface>([&](auto) { return "salmon"; })
       .Default([&](auto) { return "moccasin"; });
 }
 
@@ -1422,6 +1433,9 @@ LogicalResult DOTPrinter::printEdge(OpOperand &oprd,
     return failure();
   if (isBackedge(val, dst))
     os << (legacy ? ", " : "") << " color=\"blue\"";
+  // Print speculative edge attribute
+  if (experimental::speculation::isSpeculative(oprd, true))
+    os << ((legacy || isBackedge(val, dst)) ? ", " : "") << " speculative=1";
   os << "]\n";
   return success();
 }
